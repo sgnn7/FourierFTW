@@ -1,11 +1,11 @@
-package org.sgnn7.fourier.dft;
+package org.sgnn7.fourier.ft;
 
-
-public class DFT {
+public class DFT implements ITransformer {
 	static final double PI = 3.1415926535897932384626433832795;
 	static final double TWO_PI = 2 * PI;
 
-	public ComplexNumber[][] calculateDFT(ComplexNumber[][] originalImage, boolean inverse) {
+	@Override
+	public ComplexNumber[][] calculateFT(ComplexNumber[][] originalImage, boolean inverse) {
 		int imageWidth = originalImage.length;
 		int imageHeight = originalImage[0].length;
 
@@ -50,8 +50,8 @@ public class DFT {
 	private ComplexNumber getAdditives(ComplexNumber complex, double a) {
 		double sineValue = Math.sin(a);
 		double cosineValue = Math.cos(a);
-		return new ComplexNumber(getRealAdditive(complex, sineValue, cosineValue), getImaginaryAdditive(complex, sineValue,
-				cosineValue));
+		return new ComplexNumber(getRealAdditive(complex, sineValue, cosineValue), getImaginaryAdditive(complex,
+				sineValue, cosineValue));
 	}
 
 	private double getRealAdditive(ComplexNumber complex, double sineValue, double cosineValue) {

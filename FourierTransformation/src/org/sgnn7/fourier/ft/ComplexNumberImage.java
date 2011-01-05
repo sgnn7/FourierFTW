@@ -1,4 +1,4 @@
-package org.sgnn7.fourier.dft;
+package org.sgnn7.fourier.ft;
 
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
@@ -8,14 +8,15 @@ import org.sgnn7.fourier.util.ARGBUtils;
 import org.sgnn7.fourier.util.ARGBUtils.ColorChannel;
 
 public class ComplexNumberImage {
-
-	Map<ColorChannel, ComplexNumber[][]> spatialImageData = new HashMap<ColorChannel, ComplexNumber[][]>();
-	Map<ColorChannel, ComplexNumber[][]> frequencyImageData = new HashMap<ColorChannel, ComplexNumber[][]>();
-
 	private final BufferedImage originalImage;
+
+	private Map<ColorChannel, ComplexNumber[][]> spatialImageData = new HashMap<ColorChannel, ComplexNumber[][]>();
+	private Map<ColorChannel, ComplexNumber[][]> frequencyImageData = new HashMap<ColorChannel, ComplexNumber[][]>();
 
 	public ComplexNumberImage(BufferedImage originalImage) {
 		this.originalImage = originalImage;
+		System.out
+				.println("Dimensions [ x = " + originalImage.getWidth() + ", y = " + originalImage.getHeight() + " ]");
 		for (ColorChannel colorChannel : ColorChannel.values()) {
 			spatialImageData.put(colorChannel, getChannelImageData(originalImage, colorChannel));
 		}
@@ -36,15 +37,15 @@ public class ComplexNumberImage {
 		int imageHeight = originalImage.getHeight();
 		BufferedImage image = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
 
-		DFTThreadManager<ColorChannel> dftThreadManager = null;
+		FTThreadManager<ColorChannel> dftThreadManager = null;
 		if (doRegenerate) {
-			dftThreadManager = new DFTThreadManager<ColorChannel>(spatialImageData, ColorChannel.values(), false);
+			dftThreadManager = new FTThreadManager<ColorChannel>(spatialImageData, ColorChannel.values(), false);
 		}
 
 		for (ColorChannel colorChannel : ColorChannel.values()) {
 			ComplexNumber[][] transformedImage = null;
 			if (doRegenerate) {
-				transformedImage = dftThreadManager.getDFT(colorChannel);
+				transformedImage = dftThreadManager.getFT(colorChannel);
 				frequencyImageData.put(colorChannel, transformedImage);
 			} else {
 				transformedImage = frequencyImageData.get(colorChannel);
@@ -54,10 +55,8 @@ public class ComplexNumberImage {
 				for (int x = 0; x < image.getWidth(); x++) {
 					int offsetX = isOffset ? (x + (imageWidth / 2)) % imageWidth : x;
 					int offsetY = isOffset ? (y + (imageHeight / 2)) % imageHeight : y;
-					int color = (int) Math.abs(transformedImage[offsetX][offsetY].getRealPart());
-					color = ARGBUtils.clampColorRange(color);
-					color = ARGBUtils.shiftToARGBColorChannel(color, colorChannel);
-					image.setRGB(x, y, ARGBUtils.addColors(image.getRGB(x, y), ARGBUtils.maskARGBTransparency(color)));
+					image.setRGB(x, y, ARGBUtils.addColors(image.getRGB(x, y),
+							getFrequencyClampedRealValueColor(offsetX, offsetY, transformedImage, colorChannel)));
 				}
 			}
 		}
@@ -73,8 +72,34 @@ public class ComplexNumberImage {
 		for (ColorChannel colorChannel : ColorChannel.values()) {
 			ComplexNumber[][] channelImage = frequencyImageData.get(colorChannel);
 			int channelColorValue = ARGBUtils.getChannel(color, colorChannel);
-			channelImage[offsetX][offsetY] = new ComplexNumber(channelColorValue, channelColorValue);
+			try {
+				channelImage[offsetX][offsetY] = new ComplexNumber(channelColorValue, channelColorValue);
+			} catch (ArrayIndexOutOfBoundsException aiobe) {
+				System.err.println("Index [" + offsetX + "],[" + offsetY + "] is invalid");
+			}
 		}
+	}
+
+	public int getFrequencyDomainPixel(int x, int y, boolean isOffset) {
+		int imageWidth = originalImage.getWidth();
+		int imageHeight = originalImage.getHeight();
+		int offsetX = isOffset ? (x + (imageWidth / 2)) % imageWidth : x;
+		int offsetY = isOffset ? (y + (imageHeight / 2)) % imageHeight : y;
+
+		int colorValue = 0;
+		for (ColorChannel colorChannel : ColorChannel.values()) {
+			ComplexNumber[][] channelImage = frequencyImageData.get(colorChannel);
+			colorValue += getFrequencyClampedRealValueColor(offsetX, offsetY, channelImage, colorChannel);
+		}
+
+		return colorValue;
+	}
+
+	private int getFrequencyClampedRealValueColor(int x, int y, ComplexNumber[][] channelImage, ColorChannel channel) {
+		int color = (int) Math.abs(channelImage[x][y].getRealPart());
+		color = ARGBUtils.clampColorRange(color);
+		color = ARGBUtils.shiftToARGBColorChannel(color, channel);
+		return ARGBUtils.maskARGBTransparency(color);
 	}
 
 	public BufferedImage getSpatialDomainImage() {
@@ -87,11 +112,11 @@ public class ComplexNumberImage {
 			getFrequencyDomainImage(true, true);
 		}
 
-		DFTThreadManager<ColorChannel> dftThreadManager = new DFTThreadManager<ColorChannel>(frequencyImageData,
+		FTThreadManager<ColorChannel> dftThreadManager = new FTThreadManager<ColorChannel>(frequencyImageData,
 				ColorChannel.values(), true);
 
 		for (ColorChannel colorChannel : ColorChannel.values()) {
-			ComplexNumber[][] transformedImage = dftThreadManager.getDFT(colorChannel);
+			ComplexNumber[][] transformedImage = dftThreadManager.getFT(colorChannel);
 			spatialImageData.put(colorChannel, transformedImage);
 
 			for (int y = 0; y < image.getHeight(); y++) {
@@ -107,10 +132,6 @@ public class ComplexNumberImage {
 		System.out.println("Finished calculating spatial domain image");
 
 		return image;
-	}
-
-	double getRawPixelValue(int x, int y, ColorChannel channel) {
-		return spatialImageData.get(channel)[x][y].getRealPart();
 	}
 
 	public int getWidth() {

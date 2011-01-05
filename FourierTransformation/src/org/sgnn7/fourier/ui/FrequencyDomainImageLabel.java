@@ -9,31 +9,27 @@ import java.awt.image.BufferedImage;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 
-import org.sgnn7.fourier.dft.ComplexNumberImage;
+import org.sgnn7.fourier.ft.ComplexNumberImage;
 import org.sgnn7.fourier.util.ARGBUtils;
 
-public class JEditableLabel extends JLabel {
+public class FrequencyDomainImageLabel extends JLabel {
 	private static final long serialVersionUID = 1L;
 	private static final boolean IS_OFFSET = true;
 
 	private static final Cursor crosshairsCursor = new Cursor(Cursor.CROSSHAIR_CURSOR);
 	private static final Cursor arrowCursor = new Cursor(Cursor.DEFAULT_CURSOR);
 
-	private final ComplexNumberImage complexImage;
-	private final int scale;
+	private ComplexNumberImage complexImage = null;
+	private int scale = 1;
 	private int lastColorUsed;
 
-	public JEditableLabel(final ComplexNumberImage complexImage, final int scale) {
-		super(new ImageIcon(ARGBUtils.scaleImage(getFrequencyDomainImage(complexImage), scale)));
-		this.complexImage = complexImage;
-		this.scale = scale;
-
+	public FrequencyDomainImageLabel() {
 		this.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
 				Point imageCoordinate = toImageCoordinates(e.getPoint());
 				updatePixel(e.getButton(), imageCoordinate);
-				setIcon(new ImageIcon(ARGBUtils.scaleImage(getFrequencyDomainImage(complexImage), scale)));
+				updateImage();
 			}
 
 			@Override
@@ -51,14 +47,14 @@ public class JEditableLabel extends JLabel {
 			public void mouseDragged(MouseEvent e) {
 				Point imageCoordinate = toImageCoordinates(e.getPoint());
 				updatePixel(e.getButton(), imageCoordinate);
-				setIcon(new ImageIcon(ARGBUtils.scaleImage(getFrequencyDomainImage(complexImage), scale)));
+				updateImage();
 			}
-
 		});
 	}
 
-	private static BufferedImage getFrequencyDomainImage(ComplexNumberImage complexImage) {
-		return complexImage.getFrequencyDomainImage(IS_OFFSET, false);
+	public void updateImage() {
+		setIcon(new ImageIcon(ARGBUtils.scaleImage(getFrequencyDomainImage(complexImage), scale)));
+		this.repaint();
 	}
 
 	private Point toImageCoordinates(Point point) {
@@ -79,5 +75,15 @@ public class JEditableLabel extends JLabel {
 		} else {
 			complexImage.setFrequencyDomainPixel(imageCoordinate.x, imageCoordinate.y, IS_OFFSET, lastColorUsed);
 		}
+	}
+
+	public void updateImage(ComplexNumberImage complexImage, int scaleMutliplier) {
+		this.complexImage = complexImage;
+		this.scale = scaleMutliplier;
+		updateImage();
+	}
+
+	private static BufferedImage getFrequencyDomainImage(ComplexNumberImage complexImage) {
+		return complexImage.getFrequencyDomainImage(IS_OFFSET, false);
 	}
 }

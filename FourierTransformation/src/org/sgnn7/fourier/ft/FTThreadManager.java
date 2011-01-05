@@ -1,4 +1,4 @@
-package org.sgnn7.fourier.dft;
+package org.sgnn7.fourier.ft;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -7,15 +7,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-
-public class DFTThreadManager<T> {
+public class FTThreadManager<T> {
 	private final Map<T, ComplexNumber[][]> imageDataMap;
 	private final T[] mapValues;
 	private final boolean isInverse;
+
 	private Map<T, Future<ComplexNumber[][]>> runnerThreadMap = new HashMap<T, Future<ComplexNumber[][]>>();
 	private ExecutorService executor;
 
-	public DFTThreadManager(Map<T, ComplexNumber[][]> imageDataMap, T[] mapValues, boolean isInverse) {
+	public FTThreadManager(Map<T, ComplexNumber[][]> imageDataMap, T[] mapValues, boolean isInverse) {
 		this.imageDataMap = imageDataMap;
 		this.mapValues = mapValues;
 		this.isInverse = isInverse;
@@ -28,8 +28,11 @@ public class DFTThreadManager<T> {
 
 		for (T mapValue : mapValues) {
 			ComplexNumber[][] channelImage = imageDataMap.get(mapValue);
-			DFTCallableRunner dftRunner = new DFTCallableRunner(channelImage, isInverse);
-			System.out.println("Calculating DFT for " + mapValue + " channel");
+			boolean useFFT = imageHasPowerOf2Dimensions(channelImage);
+			ITransformer transformer = useFFT ? new FFT() : new DFT();
+			FTCallableRunner dftRunner = new FTCallableRunner(channelImage, transformer, isInverse);
+			System.out.println("Calculating transform for " + mapValue + " channel using "
+					+ transformer.getClass().getSimpleName() + "[inverse = " + isInverse + "]");
 			Future<ComplexNumber[][]> runnerFuture = executor.submit(dftRunner);
 			runnerThreadMap.put(mapValue, runnerFuture);
 		}
@@ -37,7 +40,15 @@ public class DFTThreadManager<T> {
 		executor.shutdown();
 	}
 
-	public ComplexNumber[][] getDFT(T channel) {
+	private boolean imageHasPowerOf2Dimensions(ComplexNumber[][] channelImage) {
+		return isPowerOf2(channelImage.length) && isPowerOf2(channelImage[0].length);
+	}
+
+	private boolean isPowerOf2(int length) {
+		return (length & (length - 1)) == 0;
+	}
+
+	public ComplexNumber[][] getFT(T channel) {
 		ComplexNumber[][] convertedChannelImage = null;
 		try {
 			Future<ComplexNumber[][]> future = runnerThreadMap.get(channel);
@@ -52,18 +63,20 @@ public class DFTThreadManager<T> {
 		return convertedChannelImage;
 	}
 
-	private class DFTCallableRunner implements Callable<ComplexNumber[][]> {
+	private class FTCallableRunner implements Callable<ComplexNumber[][]> {
 		private final boolean inverse;
 		private final ComplexNumber[][] originalImage;
+		private final ITransformer transformer;
 
-		public DFTCallableRunner(ComplexNumber[][] originalImage, boolean inverse) {
+		public FTCallableRunner(ComplexNumber[][] originalImage, ITransformer transformer, boolean inverse) {
 			this.originalImage = originalImage;
+			this.transformer = transformer;
 			this.inverse = inverse;
 		}
 
 		@Override
 		public ComplexNumber[][] call() throws Exception {
-			return new DFT().calculateDFT(originalImage, inverse);
+			return transformer.calculateFT(originalImage, inverse);
 		}
 	}
 }

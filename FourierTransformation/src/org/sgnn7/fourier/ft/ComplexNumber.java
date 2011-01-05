@@ -1,4 +1,4 @@
-package org.sgnn7.fourier.dft;
+package org.sgnn7.fourier.ft;
 
 public class ComplexNumber {
 	private final double real;
@@ -7,6 +7,10 @@ public class ComplexNumber {
 	public ComplexNumber(double real, double imag) {
 		this.real = real;
 		this.imaginary = imag;
+	}
+
+	public ComplexNumber(ComplexNumber number) {
+		this(number.getRealPart(), number.getImaginaryPart());
 	}
 
 	public double getRealPart() {
